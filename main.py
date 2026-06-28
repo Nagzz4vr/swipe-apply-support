@@ -2,9 +2,9 @@ import os
 from fastapi import FastAPI, Query, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
 from jobspy import scrape_jobs
+import pandas as pd
 
 app = FastAPI()
-
 API_KEY = os.environ.get("JOBSPY_API_KEY")
 API_KEY_NAME = "x-api-key"
 
@@ -33,4 +33,16 @@ def get_jobs(
         is_remote=remote_only,
         country_indeed="India"
     )
-    return jobs.fillna("").to_dict(orient="records")
+
+    # Convert all date/datetime columns to strings
+    for col in jobs.select_dtypes(include=["datetime", "datetimetz"]).columns:
+        jobs[col] = jobs[col].astype(str)
+
+    # Fill NaN and NaT with empty string, convert to dict
+    jobs = jobs.fillna("").replace({pd.NaT: ""})
+
+    return jobs.to_dict(orient="records")
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
