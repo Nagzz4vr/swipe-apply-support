@@ -1,14 +1,29 @@
-from fastapi import FastAPI, Query
+import os
+from fastapi import FastAPI, Query, HTTPException, Security
+from fastapi.security.api_key import APIKeyHeader
 from jobspy import scrape_jobs
 
 app = FastAPI()
+
+API_KEY = os.environ.get("JOBSPY_API_KEY")
+API_KEY_NAME = "x-api-key"
+
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+def verify_api_key(key: str = Security(api_key_header)):
+    if not API_KEY:
+        raise HTTPException(status_code=500, detail="API key not configured on server")
+    if key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    return key
 
 @app.get("/jobs")
 def get_jobs(
     keyword: str = Query(...),
     location: str = Query(default="India"),
     results: int = Query(default=50),
-    remote_only: bool = Query(default=False)
+    remote_only: bool = Query(default=False),
+    _: str = Security(verify_api_key)
 ):
     jobs = scrape_jobs(
         site_name=["linkedin", "indeed", "glassdoor"],
